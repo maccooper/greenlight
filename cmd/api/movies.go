@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"greenlight.maccooper.net/internal/data"
+	"greenlight.maccooper.net/internal/validator"
 )
 
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
@@ -34,5 +35,39 @@ func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request)
 
 // Handler for "POST /v1/movies endpoint
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "create a new movie")
+
+	// Anoynmous struct to hold info we expect to be in our http req
+	var input struct {
+		Title   string       `json:"title"`
+		Year    int32        `json:"year"`
+		Runtime data.Runtime `json:"runtime"`
+		Genres  []string     `json:"genres"`
+	}
+
+	// init json decoder, takes a pointer to our struct
+	err := app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+
+	}
+
+	// Copy the values from the input struct to a new movie struct
+	movie := &data.Movie{
+		Title:   input.Title,
+		Year:    input.Year,
+		Runtime: input.Runtime,
+		Genres:  input.Genres,
+	}
+
+	v := validator.New()
+
+	// Any of the checks fail
+	if data.ValidateMovie(v, movie); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	//Dump struct contents into http response.
+	fmt.Fprintf(w, "%+v\n", input)
 }
